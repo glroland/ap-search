@@ -52,8 +52,7 @@ def search_quip(accessToken, searchTerm):
         for k, v in result.items():
             print(k, v)
 
-    # bAutAawGaUay
-    thread = client.get_thread(id="bAutAawGaUay")
+    thread = client.get_thread(id="ab")
 
     threadSearch = thread['html'].casefold().find(searchTerm.casefold())
     print (threadSearch)
