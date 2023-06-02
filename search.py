@@ -1,6 +1,7 @@
 import sys
 import quip
 import os
+import subprocess
 
 #####################################################################
 ## Constants
@@ -8,6 +9,8 @@ import os
 TEXT_INDENT = " - "
 CONFIG_FILENAME = ".search.py.settings"
 CONFIG_KEY_QUIP_ACCESS_TOKEN = "QUIP_ACCESS_TOKEN"
+CONFIG_KEY_SFDC_USERNAME = "SFDC_USERNAME"
+CONFIG_KEY_SFDC_QUERY = "SFDC_QUERY"
 
 
 #####################################################################
@@ -32,15 +35,46 @@ def main():
 
     config = load_config()
 
-    for searchTerm in searchTerms:
-        search_quip(config[CONFIG_KEY_QUIP_ACCESS_TOKEN], searchTerm)
+    results = sfdc_query(config)
+    for line in results:
+        print(line)
 
+#    for searchTerm in searchTerms:
+#        search_quip(config[CONFIG_KEY_QUIP_ACCESS_TOKEN], searchTerm, config["TEST_DOC_ID"].casefold())
+
+
+#####################################################################
+## Query SFDC for a list of Quip Documents to search
+#####################################################################
+def sfdc_query(config):
+
+    print ("Executing SOQL query to search for Quip documents now using SFDX...  Expecting that you have already authenticated prior to running this script.")
+    command = [
+        "sfdx",
+        "data:soql:query",
+        "-q",
+        config[CONFIG_KEY_SFDC_QUERY].casefold(),
+        "-o",
+        config[CONFIG_KEY_SFDC_USERNAME].casefold(),
+        "-r",
+        "csv"
+    ]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    stdout, stderrr = process.communicate()
+    if (process.returncode != 0):
+        print ("An error occurred while executing the SOQL query through SFDX!  Return Code=" + str(process.returncode))
+        sys.exit()
+
+    lines = stdout.splitlines()
+    del lines[0]
+    
+    return lines
 
 
 #####################################################################
 ## Search a given Quip document for a keyword
 #####################################################################
-def search_quip(accessToken, searchTerm):
+def search_quip(accessToken, searchTerm, testDocId):
     client = quip.QuipClient(access_token=accessToken)
     user = client.get_authenticated_user()
 
@@ -52,7 +86,7 @@ def search_quip(accessToken, searchTerm):
         for k, v in result.items():
             print(k, v)
 
-    thread = client.get_thread(id="ab")
+    thread = client.get_thread(id=testDocId)
 
     threadSearch = thread['html'].casefold().find(searchTerm.casefold())
     print (threadSearch)
