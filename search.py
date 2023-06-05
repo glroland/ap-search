@@ -2,6 +2,9 @@ import sys
 import quip
 import os
 import subprocess
+import http
+import urllib
+
 
 #####################################################################
 ## Constants
@@ -13,6 +16,8 @@ CONFIG_KEY_QUIP_URL_STRIP = "QUIP_URL_STRIP"
 CONFIG_KEY_SFDC_USERNAME = "SFDC_USERNAME"
 CONFIG_KEY_SFDC_QUERY = "SFDC_QUERY"
 CONFIG_KEY_KEYWORDS = "KEYWORDS"
+CONFIG_KEY_MAX_RESULTS = "MAX_RESULTS"
+CONFIG_KEY_CACHE_DIR = "CACHE_DIR"
 
 
 #####################################################################
@@ -44,6 +49,11 @@ def main():
         print(TEXT_INDENT + searchTerm)
     print()
 
+    cacheDir = config[CONFIG_KEY_CACHE_DIR]
+    if (len(cacheDir) == 0):
+        print ("Cache Directory is empty but required!")
+        sys.exit()
+
     quipAccessToken = config[CONFIG_KEY_QUIP_ACCESS_TOKEN].strip()
 
     results = sfdc_query(config)
@@ -54,46 +64,161 @@ def main():
     outputHeader = outputHeader + searchTerms
     output = [ outputHeader ]
 
+    maxResults = int(config[CONFIG_KEY_MAX_RESULTS].strip())
+
+    numResults = 0
     for line in results:
         l = line.strip()
         if (len(l) > 0):
             csv = l.split(',')
 
-            accountId = csv[0].strip()
-            accountName = csv[1].strip()
-            accountSubRegion = csv[2].strip()
-            accountPlanUrl = csv[3].strip()
-            csPlanUrl = csv[4].strip()
+            accountId = csv[0].strip().replace("\"", "")
+            accountName = csv[1].strip().replace("\"", "")
+            accountSubRegion = csv[2].strip().replace("\"", "")
+            accountPlanUrl = csv[3].strip().replace("\"", "")
+            csPlanUrl = csv[4].strip().replace("\"", "")
 
-            process_account(output, quipAccessToken, config[CONFIG_KEY_QUIP_URL_STRIP].strip(), accountId, accountName, accountSubRegion, accountPlanUrl, csPlanUrl, searchTerms)
+            o = process_account(cacheDir, quipAccessToken, config[CONFIG_KEY_QUIP_URL_STRIP].strip(), accountId, accountName, accountSubRegion, accountPlanUrl, csPlanUrl, searchTerms)
+            output.append(o)
+
+        numResults += 1
+        if (maxResults != 0) and (numResults >= maxResults):
+            print ("Max Results Limit reached: " + str(maxResults))
+            break
 
     print ("Number of lines: " + str(len(output)))
     for line in output:
+        line = [x.strip() for x in line]
+#        text = ""
+#        i = 0
+#        while i < len(line):
+#            text = text + line[i] + ","
+#            i += 1
+#        columnPrint = text
         columnPrint = ",".join(line)
         print(columnPrint)
 
 
 #####################################################################
+# Cache the specified AP document
+#####################################################################
+def cache_ap(cacheDir, accountId, apText):
+
+    filename = cacheDir + "/" + accountId + "_ap.txt"
+    with open(filename, 'x') as f:
+        f.write(apText)
+
+
+#####################################################################
+# Cache the specified cs document
+#####################################################################
+def cache_cs(cacheDir, accountId, csText):
+
+    filename = cacheDir + "/" + accountId + "_cs.txt"
+    with open(filename, 'x') as f:
+        f.write(csText)
+
+
+#####################################################################
+# Gets the cached AP if it exists
+#####################################################################
+def get_cached_ap(cacheDir, accountId):
+    filename = cacheDir + "/" + accountId + "_ap.txt"
+
+    try:
+        with open(filename, 'r') as f:
+            return f.read()
+    except FileNotFoundError:
+        return ""
+
+
+#####################################################################
+# Gets the cached CS if it exists
+#####################################################################
+def get_cached_cs(cacheDir, accountId):
+    filename = cacheDir + "/" + accountId + "_cs.txt"
+
+    try:
+        with open(filename, 'r') as f:
+            return f.read()
+    except FileNotFoundError:
+        return ""
+
+
+#####################################################################
 ## Process account record
 #####################################################################
-def process_account(output, accessToken, quipUrlStrip, accountId, accountName, accountSubRegion, accountPlanUrl, csPlanUrl, searchTerms):
+def process_account(cacheDir, accessToken, quipUrlStrip, accountId, accountName, accountSubRegion, accountPlanUrl, csPlanUrl, searchTerms):
     matches = 0
 
+    line = [ accountId, accountName, accountSubRegion, accountPlanUrl, csPlanUrl]
+    lineSearchTerms = [ ]
+    for searchTerm in searchTerms:
+        lineSearchTerms = lineSearchTerms + [ 0 ]
+
+# the built in search functionality for quip does not work well at all, FYI.  Reminds me of searching reddit.
 #    for searchTerm in searchTerms:
 #        search_quip(config[CONFIG_KEY_QUIP_ACCESS_TOKEN], searchTerm, config["TEST_DOC_ID"].casefold())
 
-    if (len(csPlanUrl) > 0):
-        u = csPlanUrl.replace(quipUrlStrip, "")
-        t = u.split("/", 1)
-        if (len(t) > 1):
-            docId = t[0]
-        else:
-            docId = u
-        print ("Doc ID = " + docId)
-        #csPlan = get_quip_doc(accessToken, docId)
+    # Download AP Plan
+    accountPlan = get_cached_ap(cacheDir, accountId)
+    if (len(accountPlan) == 0):
+        if (len(accountPlanUrl) > 0):
+            u = accountPlanUrl.replace(quipUrlStrip, "")
+            t = u.split("/", 1)
+            if (len(t) > 1):
+                docId = t[0]
+            else:
+                docId = u
+            print ("AP URL=" + accountPlanUrl + " U=" + u + " DocID=" + docId)
+            try:
+                accountPlan = get_quip_doc(accessToken, docId)
+                cache_ap(cacheDir, accountId, accountPlan)
+            except http.client.InvalidURL:
+                print ("Account Plan URL invalid!  AccountID=" + accountId + " AccountName=" + accountName + " URL=" + accountPlanUrl)
+            except quip.QuipError:
+                print ("Unable to access Account Plan URL, likely due to permissions!  AccountID=" + accountId + " AccountName=" + accountName + " URL=" + accountPlanUrl)
+            except urllib.error.HTTPError:
+                print ("Internal Server Error when pulling Account Plan URL!  AccountID=" + accountId + " AccountName=" + accountName + " URL=" + accountPlanUrl)
+            except TimeoutError:
+                print ("Timeout Error while pulling Account Plan URL!  AccountID=" + accountId + " AccountName=" + accountName + " URL=" + accountPlanUrl)
 
+    # Download CS Plan
+    csPlan = get_cached_cs(cacheDir, accountId)
+    if (len(csPlan) == 0):
+        if (len(csPlanUrl) > 0):
+            u = csPlanUrl.replace(quipUrlStrip, "")
+            t = u.split("/", 1)
+            if (len(t) > 1):
+                docId = t[0]
+            else:
+                docId = u
+            print ("CS Doc ID = " + docId)
+            try:
+                csPlan = get_quip_doc(accessToken, docId)
+                cache_cs(cacheDir, accountId, csPlan)
+            except http.client.InvalidURL:
+                print ("CS Plan URL invalid!  AccountID=" + accountId + " AccountName=" + accountName + " URL=" + csPlanUrl)
+            except quip.QuipError:
+                print ("Unable to access CS Plan URL, likely due to permissions!  AccountID=" + accountId + " AccountName=" + accountName + " URL=" + csPlanUrl)
+            except urllib.error.HTTPError:
+                print ("Internal Server Error when pulling CS Plan URL!  AccountID=" + accountId + " AccountName=" + accountName + " URL=" + csPlanUrl)
+            except TimeoutError:
+                print ("Timeout Error while pulling CS Plan URL!  AccountID=" + accountId + " AccountName=" + accountName + " URL=" + csPlanUrl)
 
-#    threadSearch = thread['html'].casefold().find(searchTerm.casefold())
+    searchTermIndex = 0
+    for searchTerm in searchTerms:
+        count = 0
+        if (accountPlan != ""):
+            count += accountPlan.casefold().count(searchTerm.casefold())
+        if (csPlan != ""):
+            count += csPlan.casefold().count(searchTerm.casefold())
+
+        lineSearchTerms[searchTermIndex] = count
+        searchTermIndex += 1
+
+    lineSearchTerms = [str(x) for x in lineSearchTerms]
+    return line + lineSearchTerms
 
 
 #####################################################################
