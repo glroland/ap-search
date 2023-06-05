@@ -9,8 +9,10 @@ import subprocess
 TEXT_INDENT = " - "
 CONFIG_FILENAME = ".search.py.settings"
 CONFIG_KEY_QUIP_ACCESS_TOKEN = "QUIP_ACCESS_TOKEN"
+CONFIG_KEY_QUIP_URL_STRIP = "QUIP_URL_STRIP"
 CONFIG_KEY_SFDC_USERNAME = "SFDC_USERNAME"
 CONFIG_KEY_SFDC_QUERY = "SFDC_QUERY"
+CONFIG_KEY_KEYWORDS = "KEYWORDS"
 
 
 #####################################################################
@@ -20,27 +22,78 @@ def main():
     print("search.py")
     print()
 
-    numArguments = len(sys.argv)
-    if numArguments <= 1:
-        print ("Usage: search.py <search_term> .......")
-        print ("<search_term> can be repeated to incorporate searching on as many terms as desired")
-        sys.exit()
+    print ("Usage: search.py [<search_term> .......]")
+    print ("<search_term> can be repeated to incorporate searching on as many terms as desired")
+    print ()
 
+    config = load_config()
+
+    # pull from command-line first
     searchTerms = sys.argv
     del searchTerms[0]
+
+    # append from config file
+    searchTerms = searchTerms + config[CONFIG_KEY_KEYWORDS].strip().split(",")
+
+    if (len(searchTerms) == 0):
+        print ("At least one search term is required, either via command line or in the properties file!")
+        sys.exit()
+
     print ("Search Terms:")
     for searchTerm in searchTerms:
         print(TEXT_INDENT + searchTerm)
     print()
 
-    config = load_config()
+    quipAccessToken = config[CONFIG_KEY_QUIP_ACCESS_TOKEN].strip()
 
     results = sfdc_query(config)
+    header = results[0]
+    del results[0]
+
+    outputHeader = header.split(",")
+    outputHeader = outputHeader + searchTerms
+    output = [ outputHeader ]
+
     for line in results:
-        print(line)
+        l = line.strip()
+        if (len(l) > 0):
+            csv = l.split(',')
+
+            accountId = csv[0].strip()
+            accountName = csv[1].strip()
+            accountSubRegion = csv[2].strip()
+            accountPlanUrl = csv[3].strip()
+            csPlanUrl = csv[4].strip()
+
+            process_account(output, quipAccessToken, config[CONFIG_KEY_QUIP_URL_STRIP].strip(), accountId, accountName, accountSubRegion, accountPlanUrl, csPlanUrl, searchTerms)
+
+    print ("Number of lines: " + str(len(output)))
+    for line in output:
+        columnPrint = ",".join(line)
+        print(columnPrint)
+
+
+#####################################################################
+## Process account record
+#####################################################################
+def process_account(output, accessToken, quipUrlStrip, accountId, accountName, accountSubRegion, accountPlanUrl, csPlanUrl, searchTerms):
+    matches = 0
 
 #    for searchTerm in searchTerms:
 #        search_quip(config[CONFIG_KEY_QUIP_ACCESS_TOKEN], searchTerm, config["TEST_DOC_ID"].casefold())
+
+    if (len(csPlanUrl) > 0):
+        u = csPlanUrl.replace(quipUrlStrip, "")
+        t = u.split("/", 1)
+        if (len(t) > 1):
+            docId = t[0]
+        else:
+            docId = u
+        print ("Doc ID = " + docId)
+        #csPlan = get_quip_doc(accessToken, docId)
+
+
+#    threadSearch = thread['html'].casefold().find(searchTerm.casefold())
 
 
 #####################################################################
@@ -48,14 +101,21 @@ def main():
 #####################################################################
 def sfdc_query(config):
 
+    sqlQuery = config[CONFIG_KEY_SFDC_QUERY].strip()
+    if (sqlQuery.casefold()[:6] != "select"):
+        print ("Only SELECT statements are appropriate for use!  Query=" + sqlQuery)
+        sys.exit()
+    else:
+        print ("SOQL statement validated to to be a query...")
+    
     print ("Executing SOQL query to search for Quip documents now using SFDX...  Expecting that you have already authenticated prior to running this script.")
     command = [
         "sfdx",
         "data:soql:query",
         "-q",
-        config[CONFIG_KEY_SFDC_QUERY].casefold(),
+        sqlQuery,
         "-o",
-        config[CONFIG_KEY_SFDC_USERNAME].casefold(),
+        config[CONFIG_KEY_SFDC_USERNAME].strip(),
         "-r",
         "csv"
     ]
@@ -66,9 +126,19 @@ def sfdc_query(config):
         sys.exit()
 
     lines = stdout.splitlines()
-    del lines[0]
     
     return lines
+
+
+#####################################################################
+## Downloads the given Quip document
+#####################################################################
+def get_quip_doc(accessToken, docId):
+    client = quip.QuipClient(access_token=accessToken)
+    user = client.get_authenticated_user()
+
+    thread = client.get_thread(id=docId)
+    return thread['html']
 
 
 #####################################################################
@@ -125,4 +195,8 @@ def load_config():
 
     return config
 
+
+#####################################################################
+##  Program Entry Point
+#####################################################################
 main()
