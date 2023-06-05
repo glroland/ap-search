@@ -57,7 +57,7 @@ def main():
 
     quipAccessToken = config[CONFIG_KEY_QUIP_ACCESS_TOKEN].strip()
 
-    sfdcCsvText = sfdc_query(config)
+    sfdcCsvText = sfdc_query(cacheDir, config)
     results = sfdcCsvText.splitlines()
     header = results[0]
     del results[0]
@@ -85,8 +85,8 @@ def main():
             break
 
     print ("Number of lines: " + str(len(output)))
-    outputFilename = cacheDir + "/output.csv"
-    os.remove(outputFilename)
+    outputFilename = cacheDir + "/report.csv"
+    delete_file(outputFilename)
     with open(outputFilename, "x") as csvFile:
         csvWriter = csv.writer(csvFile, quotechar='"', delimiter=',', quoting=csv.QUOTE_ALL)
         for line in output:
@@ -95,6 +95,15 @@ def main():
 
     print ("CSV Output Complete!")
 
+
+#####################################################################
+# Deletes the file from disk, if it exists
+#####################################################################
+def delete_file(filename):
+    try:
+        os.remove(filename)
+    except FileNotFoundError:
+        return
 
 #####################################################################
 # Cache the specified AP document
@@ -234,7 +243,7 @@ def process_account(cacheDir, accessToken, quipUrlStrip, accountId, accountName,
 #####################################################################
 ## Query SFDC for a list of Quip Documents to search
 #####################################################################
-def sfdc_query(config):
+def sfdc_query(cacheDir, config):
 
     sqlQuery = config[CONFIG_KEY_SFDC_QUERY].strip()
     if (sqlQuery.casefold()[:6] != "select"):
@@ -259,6 +268,11 @@ def sfdc_query(config):
     if (process.returncode != 0):
         print ("An error occurred while executing the SOQL query through SFDX!  Return Code=" + str(process.returncode))
         sys.exit()
+
+    filename = cacheDir + "/soql.csv"
+    delete_file(filename)
+    with open(filename, 'x') as f:
+        f.write(stdout)
 
     return stdout
 
