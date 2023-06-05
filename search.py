@@ -4,6 +4,7 @@ import os
 import subprocess
 import http
 import urllib
+import csv
 
 
 #####################################################################
@@ -56,7 +57,8 @@ def main():
 
     quipAccessToken = config[CONFIG_KEY_QUIP_ACCESS_TOKEN].strip()
 
-    results = sfdc_query(config)
+    sfdcCsvText = sfdc_query(config)
+    results = sfdcCsvText.splitlines()
     header = results[0]
     del results[0]
 
@@ -67,19 +69,15 @@ def main():
     maxResults = int(config[CONFIG_KEY_MAX_RESULTS].strip())
 
     numResults = 0
-    for line in results:
-        l = line.strip()
-        if (len(l) > 0):
-            csv = l.split(',')
+    for line in csv.reader(results, quotechar='"', delimiter=',', quoting=csv.QUOTE_ALL, skipinitialspace=True):
+        accountId = line[0].strip()
+        accountName = line[1].strip()
+        accountSubRegion = line[2].strip()
+        accountPlanUrl = line[3].strip()
+        csPlanUrl = line[4].strip()
 
-            accountId = csv[0].strip().replace("\"", "")
-            accountName = csv[1].strip().replace("\"", "")
-            accountSubRegion = csv[2].strip().replace("\"", "")
-            accountPlanUrl = csv[3].strip().replace("\"", "")
-            csPlanUrl = csv[4].strip().replace("\"", "")
-
-            o = process_account(cacheDir, quipAccessToken, config[CONFIG_KEY_QUIP_URL_STRIP].strip(), accountId, accountName, accountSubRegion, accountPlanUrl, csPlanUrl, searchTerms)
-            output.append(o)
+        o = process_account(cacheDir, quipAccessToken, config[CONFIG_KEY_QUIP_URL_STRIP].strip(), accountId, accountName, accountSubRegion, accountPlanUrl, csPlanUrl, searchTerms)
+        output.append(o)
 
         numResults += 1
         if (maxResults != 0) and (numResults >= maxResults):
@@ -87,16 +85,15 @@ def main():
             break
 
     print ("Number of lines: " + str(len(output)))
-    for line in output:
-        line = [x.strip() for x in line]
-#        text = ""
-#        i = 0
-#        while i < len(line):
-#            text = text + line[i] + ","
-#            i += 1
-#        columnPrint = text
-        columnPrint = ",".join(line)
-        print(columnPrint)
+    outputFilename = cacheDir + "/output.csv"
+    os.remove(outputFilename)
+    with open(outputFilename, "x") as csvFile:
+        csvWriter = csv.writer(csvFile, quotechar='"', delimiter=',', quoting=csv.QUOTE_ALL)
+        for line in output:
+            line = [x.strip() for x in line]
+            csvWriter.writerow(line)
+
+    print ("CSV Output Complete!")
 
 
 #####################################################################
@@ -104,7 +101,7 @@ def main():
 #####################################################################
 def cache_ap(cacheDir, accountId, apText):
 
-    filename = cacheDir + "/" + accountId + "_ap.txt"
+    filename = cacheDir + "/" + accountId + "_ap.html"
     with open(filename, 'x') as f:
         f.write(apText)
 
@@ -114,7 +111,7 @@ def cache_ap(cacheDir, accountId, apText):
 #####################################################################
 def cache_cs(cacheDir, accountId, csText):
 
-    filename = cacheDir + "/" + accountId + "_cs.txt"
+    filename = cacheDir + "/" + accountId + "_cs.html"
     with open(filename, 'x') as f:
         f.write(csText)
 
@@ -123,7 +120,7 @@ def cache_cs(cacheDir, accountId, csText):
 # Gets the cached AP if it exists
 #####################################################################
 def get_cached_ap(cacheDir, accountId):
-    filename = cacheDir + "/" + accountId + "_ap.txt"
+    filename = cacheDir + "/" + accountId + "_ap.html"
 
     try:
         with open(filename, 'r') as f:
@@ -136,7 +133,7 @@ def get_cached_ap(cacheDir, accountId):
 # Gets the cached CS if it exists
 #####################################################################
 def get_cached_cs(cacheDir, accountId):
-    filename = cacheDir + "/" + accountId + "_cs.txt"
+    filename = cacheDir + "/" + accountId + "_cs.html"
 
     try:
         with open(filename, 'r') as f:
@@ -151,6 +148,15 @@ def get_cached_cs(cacheDir, accountId):
 def process_account(cacheDir, accessToken, quipUrlStrip, accountId, accountName, accountSubRegion, accountPlanUrl, csPlanUrl, searchTerms):
     matches = 0
 
+#    print ("Cache Dir: " + cacheDir)
+#    print ("Access Token: " + accessToken)
+#    print ("Quip URL Strip: " + quipUrlStrip)
+#    print ("Account ID: " + accountId)
+#    print ("Account Name: " + accountName)
+#    print ("Account Sub Region: " + accountSubRegion)
+#    print ("Account Plan URL: " + accountPlanUrl)
+#    print ("CS Plan URL: " + csPlanUrl)
+
     line = [ accountId, accountName, accountSubRegion, accountPlanUrl, csPlanUrl]
     lineSearchTerms = [ ]
     for searchTerm in searchTerms:
@@ -162,7 +168,9 @@ def process_account(cacheDir, accessToken, quipUrlStrip, accountId, accountName,
 
     # Download AP Plan
     accountPlan = get_cached_ap(cacheDir, accountId)
-    if (len(accountPlan) == 0):
+    if (len(accountPlan) > 0):
+        print("Using AP Cache: " + accountId)
+    else:
         if (len(accountPlanUrl) > 0):
             u = accountPlanUrl.replace(quipUrlStrip, "")
             t = u.split("/", 1)
@@ -185,7 +193,9 @@ def process_account(cacheDir, accessToken, quipUrlStrip, accountId, accountName,
 
     # Download CS Plan
     csPlan = get_cached_cs(cacheDir, accountId)
-    if (len(csPlan) == 0):
+    if (len(csPlan) > 0):
+        print("Using CS Cache: " + accountId)
+    else:
         if (len(csPlanUrl) > 0):
             u = csPlanUrl.replace(quipUrlStrip, "")
             t = u.split("/", 1)
@@ -250,9 +260,7 @@ def sfdc_query(config):
         print ("An error occurred while executing the SOQL query through SFDX!  Return Code=" + str(process.returncode))
         sys.exit()
 
-    lines = stdout.splitlines()
-    
-    return lines
+    return stdout
 
 
 #####################################################################
