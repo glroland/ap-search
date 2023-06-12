@@ -5,6 +5,7 @@ import subprocess
 import http
 import urllib
 import csv
+from bs4 import BeautifulSoup
 
 
 #####################################################################
@@ -225,13 +226,20 @@ def process_account(cacheDir, accessToken, quipUrlStrip, accountId, accountName,
             except TimeoutError:
                 print ("Timeout Error while pulling CS Plan URL!  AccountID=" + accountId + " AccountName=" + accountName + " URL=" + csPlanUrl)
 
+    accountPlanSoup = None
+    if (accountPlan != ""):
+        accountPlanSoup = BeautifulSoup(accountPlan, features="html.parser")
+    csPlanSoup = None
+    if (csPlan != ""):
+        csPlanSoup = BeautifulSoup(csPlan, features="html.parser")
+
     searchTermIndex = 0
     for searchTerm in searchTerms:
         count = 0
-        if (accountPlan != ""):
-            count += accountPlan.casefold().count(searchTerm.casefold())
-        if (csPlan != ""):
-            count += csPlan.casefold().count(searchTerm.casefold())
+        if (accountPlanSoup != None):
+            count += accountPlanSoup.get_text().casefold().count(searchTerm.casefold())
+        if (csPlanSoup != None):
+            count += csPlanSoup.get_text().casefold().count(searchTerm.casefold())
 
         lineSearchTerms[searchTermIndex] = count
         searchTermIndex += 1
