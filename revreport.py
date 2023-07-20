@@ -88,12 +88,18 @@ def generateProductLevelReport(outputFile, detail):
             results.append(summaryRecord)
 
         # update yearly revenue values
-        summaryRecord["2018"] = calculateRevenueForYear(2018, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
-        summaryRecord["2019"] = calculateRevenueForYear(2019, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
-        summaryRecord["2020"] = calculateRevenueForYear(2020, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
-        summaryRecord["2021"] = calculateRevenueForYear(2021, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
-        summaryRecord["2022"] = calculateRevenueForYear(2022, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
-        summaryRecord["2023"] = calculateRevenueForYear(2023, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
+        summaryRecord["2018"] = summaryRecord["2018"] + calculateRevenueForYear(2018, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
+        summaryRecord["2019"] = summaryRecord["2019"] + calculateRevenueForYear(2019, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
+        summaryRecord["2020"] = summaryRecord["2020"] + calculateRevenueForYear(2020, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
+        summaryRecord["2021"] = summaryRecord["2021"] + calculateRevenueForYear(2021, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
+        summaryRecord["2022"] = summaryRecord["2022"] + calculateRevenueForYear(2022, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
+        summaryRecord["2023"] = summaryRecord["2023"] + calculateRevenueForYear(2023, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
+
+        if ("marsh" in detailRecord["accountName"].lower()):
+            print (detailRecord)
+            print (summaryRecord)
+            print()
+
 
     print (str(len(results)) + " records are in the resulting product level report.")
 
@@ -215,7 +221,7 @@ def loadDetailFromInputFile(inputFilename):
                     "productFamily": csvLine[33],
                     "startDate": datetime.strptime(csvLine[15], '%m/%d/%Y').date(),
                     "endDate": datetime.strptime(csvLine[16], '%m/%d/%Y').date(),
-                    "amount": float(csvLine[25])
+                    "amount": float(csvLine[29])
                 }
                 if len(record["accountName"].strip()) == 0:
                     record["accountName"] = record["individualAccountName"]
