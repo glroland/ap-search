@@ -66,14 +66,15 @@ def generateProductLevelReport(outputFile, detail):
         # does record exist in results?
         summaryRecord = None
         for r in results:
-            if (r["accountOwner"] == detailRecord["accountOwner"]) and (r["accountName"] == detailRecord["accountName"]) and (r["productLine"] == detailRecord["productLine"]):
+#            if (r["accountOwner"] == detailRecord["accountOwner"]) and (r["accountName"] == detailRecord["accountName"]) and (r["productLine"] == detailRecord["productLine"]):
+            if (r["accountName"] == detailRecord["accountName"]) and (r["productLine"] == detailRecord["productLine"]):
                 if summaryRecord != None:
                     print ("ERROR> Multiple Summary Records found in result set!")
                     sys.exit()
                 summaryRecord = r
         if summaryRecord == None:
             summaryRecord = {
-                "accountOwner": detailRecord["accountOwner"],
+#                "accountOwner": detailRecord["accountOwner"],
                 "accountName": detailRecord["accountName"],
                 "productLine": detailRecord["productLine"],
                 "2018": 0.0,
@@ -100,7 +101,8 @@ def generateProductLevelReport(outputFile, detail):
         os.remove(outputFile)
     f = open(outputFile, "w")
     for r in results:
-        f.write("\"" + r["accountOwner"] + "\",\"" +  r["accountName"] + "\",\"" + r["productLine"] + "\"," + str(r["2018"]) + "," + str(r["2019"]) + "," + str(r["2020"]) + "," + str(r["2021"]) + "," + str(r["2022"]) + "," + str(r["2023"]) + "\n")
+#        f.write("\"" + r["accountOwner"] + "\",\"" +  r["accountName"] + "\",\"" + r["productLine"] + "\"," + str(r["2018"]) + "," + str(r["2019"]) + "," + str(r["2020"]) + "," + str(r["2021"]) + "," + str(r["2022"]) + "," + str(r["2023"]) + "\n")
+        f.write("\"" +  r["accountName"] + "\",\"" + r["productLine"] + "\"," + str(r["2018"]) + "," + str(r["2019"]) + "," + str(r["2020"]) + "," + str(r["2021"]) + "," + str(r["2022"]) + "," + str(r["2023"]) + "\n")
 
     return results
 
@@ -147,14 +149,15 @@ def generateSummaryReport(outputFile, productLevelReportDetail):
         # does record exist in results?
         summaryRecord = None
         for r in results:
-            if (r["accountOwner"] == detailRecord["accountOwner"]) and (r["accountName"] == detailRecord["accountName"]):
+#            if (r["accountOwner"] == detailRecord["accountOwner"]) and (r["accountName"] == detailRecord["accountName"]):
+            if (r["accountName"] == detailRecord["accountName"]):
                 if summaryRecord != None:
                     print ("ERROR> Multiple Summary Records found in result set!")
                     sys.exit()
                 summaryRecord = r
         if summaryRecord == None:
             summaryRecord = {
-                "accountOwner": detailRecord["accountOwner"],
+#                "accountOwner": detailRecord["accountOwner"],
                 "accountName": detailRecord["accountName"],
                 "2018": 0.0,
                 "2019": 0.0,
@@ -180,7 +183,8 @@ def generateSummaryReport(outputFile, productLevelReportDetail):
         os.remove(outputFile)
     f = open(outputFile, "w")
     for r in results:
-        f.write("\"" + r["accountOwner"] + "\",\"" +  r["accountName"] + "\"," + str(r["2018"]) + "," + str(r["2019"]) + "," + str(r["2020"]) + "," + str(r["2021"]) + "," + str(r["2022"]) + "," + str(r["2023"]) + "\n")
+#        f.write("\"" + r["accountOwner"] + "\",\"" +  r["accountName"] + "\"," + str(r["2018"]) + "," + str(r["2019"]) + "," + str(r["2020"]) + "," + str(r["2021"]) + "," + str(r["2022"]) + "," + str(r["2023"]) + "\n")
+        f.write("\"" +  r["accountName"] + "\"," + str(r["2018"]) + "," + str(r["2019"]) + "," + str(r["2020"]) + "," + str(r["2021"]) + "," + str(r["2022"]) + "," + str(r["2023"]) + "\n")
 
     return results
 
