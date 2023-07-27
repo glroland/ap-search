@@ -95,12 +95,6 @@ def generateProductLevelReport(outputFile, detail):
         summaryRecord["2022"] = summaryRecord["2022"] + calculateRevenueForYear(2022, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
         summaryRecord["2023"] = summaryRecord["2023"] + calculateRevenueForYear(2023, detailRecord["amount"], detailRecord["startDate"], detailRecord["endDate"])
 
-        if ("marsh" in detailRecord["accountName"].lower()):
-            print (detailRecord)
-            print (summaryRecord)
-            print()
-
-
     print (str(len(results)) + " records are in the resulting product level report.")
 
     print ("Writing data to file: " + outputFile)
@@ -221,7 +215,7 @@ def loadDetailFromInputFile(inputFilename):
                     "productFamily": csvLine[33],
                     "startDate": datetime.strptime(csvLine[15], '%m/%d/%Y').date(),
                     "endDate": datetime.strptime(csvLine[16], '%m/%d/%Y').date(),
-                    "amount": float(csvLine[29])
+                    "amount": float(csvLine[23])
                 }
                 if len(record["accountName"].strip()) == 0:
                     record["accountName"] = record["individualAccountName"]
